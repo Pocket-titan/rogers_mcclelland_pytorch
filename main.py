@@ -116,8 +116,7 @@ model.compile(
 
 # Custom callbacks for viewing the model in TensorBoard; which is launched with command:
 # $ tensorboard --logdir logs/fit
-# log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-log_dir = "logs/fit/" + "loss:mse,batch:1"
+log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 file_writer = tf.summary.create_file_writer(log_dir)
 file_writer.set_as_default()
 
