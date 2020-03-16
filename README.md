@@ -24,4 +24,10 @@ To view the logs in TensorBoard after execution, run
 tensorboard --logdir logs/fit
 ```
 
-and go to `localhost:6006` in your browser.
+and go to `localhost:6006` in your browser. One run will show up in TensorBoard as two sets of data; one containing the scalar metrics (in `${run_name}/train`) and another containing the images (in `${run_name}/`).
+
+To clear the logs (the folder tends to fill up fast), run
+
+```bash
+python clear_logs.py
+```
