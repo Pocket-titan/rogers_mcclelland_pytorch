@@ -1,6 +1,7 @@
 # Tensorflow (Keras) model of semantic cognition
 
-Based on the paper "Semantic Cognition: A Parallel Distributed Processing Approach" from 2003 by Rogers, T. and McClelland, J..
+Based on the paper "Semantic Cognition: A Parallel Distributed Processing Approach" from 2003 by Rogers and McClelland, whose model is itself an adaptation of an earlier one by Rumelhart (1990).
+
 Inspired by the PyTorch implementation from https://github.com/jeffreyallenbrooks/rogers-and-mcclelland.
 
 ## Running the model
