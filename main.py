@@ -8,13 +8,13 @@ the book "Semantic Cognition" by Rogers & McClelland, using TensorFlow with a Ke
 
 from tensorflow import keras
 from sklearn.decomposition import PCA
-from matplotlib import rcParams
 import matplotlib.pyplot as plt
 import tensorflow as tf
 import seaborn as sns
 import numpy as np
 import scipy as sp
 import pandas as pd
+import matplotlib
 import datetime
 import io
 import os
@@ -121,7 +121,7 @@ file_writer = tf.summary.create_file_writer(log_dir)
 file_writer.set_as_default()
 
 
-def plot_to_image(figure):
+def plot_to_image(figure: matplotlib.figure.Figure) -> tf.Tensor:
     """Plots the provided representation, then converts it to a PNG image and
     returns it as a tensor. The created figure is closed and inaccessible after this call."""
     buf = io.BytesIO()
@@ -136,7 +136,7 @@ def plot_to_image(figure):
     return image
 
 
-def reshape(t):
+def reshape(t: list) -> tf.Tensor:
     """Reshape an array of images to tensors, for viewing in TensorBoard"""
     t = tf.convert_to_tensor(t)
     if t.shape[0] == 1:
@@ -266,6 +266,50 @@ class LogPCA(keras.callbacks.Callback):
             tf.summary.image("PCA", img, step=NUM_EPOCHS, max_outputs=1)
 
 
+weight_changes = {}
+layer_names = ["representations", "hidden", "attributes"]
+
+
+class LogWeightChange(keras.callbacks.Callback):
+    def __init__(self):
+        self.previous_weights = {}
+
+    def on_epoch_end(self, epoch, logs=None):
+        for layer_name in layer_names:
+            #  weights from prev to current layer(_name)
+            [weights, biases] = model.get_layer(name=layer_name).get_weights()
+
+            if layer_name in self.previous_weights:
+                prev = self.previous_weights[layer_name]
+                diff = np.subtract(weights, prev)
+                diff = np.abs(diff)
+                total_diff = np.sum(diff)
+
+                if layer_name in weight_changes:
+                    weight_changes[layer_name].append(total_diff)
+                else:
+                    weight_changes[layer_name] = [total_diff]
+
+            self.previous_weights[layer_name] = weights
+
+    def on_train_end(self, logs=None):
+        fig = plt.figure(figsize=(8, 8))
+        plt.tight_layout()
+        plt.title("Absolute, summed weight change over time")
+        plt.xlabel("Epochs")
+        plt.ylabel("Total weight change")
+
+        for layer_name in weight_changes:
+            changes = weight_changes[layer_name]
+            plt.plot(range(NUM_EPOCHS - 1), changes, label="{} layer".format(layer_name))
+
+        plt.legend()
+        img = plot_to_image(fig)
+
+        with file_writer.as_default():
+            tf.summary.image("Absolute weight change", img, step=0, max_outputs=1)
+
+
 # Create the TensorBoard callback
 tensorboard_callback = keras.callbacks.TensorBoard(
     log_dir=log_dir, histogram_freq=1, embeddings_freq=50
@@ -280,6 +324,7 @@ history = model.fit(
         tensorboard_callback,
         SaveRepresentation(),
         LogDistanceMatrix(),
+        LogWeightChange(),
         LogDendrogram(),
         LogPCA(),
     ],
