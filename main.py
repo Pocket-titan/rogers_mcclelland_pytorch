@@ -5,7 +5,7 @@ the book "Semantic Cognition" by Rogers & McClelland, using TensorFlow with a Ke
 - Based mainly on "Semantic Cognition: A Parallel Distributed Processing Approach", Rogers, T. and McClelland, J., 2003
   (henceforth referred to as (2003) or "the paper from 2003")
 """
-
+from tensorflow.keras import backend as K
 from tensorflow import keras
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
@@ -22,7 +22,7 @@ import os
 plt.style.use("plotstyle.mplstyle")
 
 # Model parameters
-NUM_EPOCHS = 2000
+NUM_EPOCHS = 3500
 SAVE_INTERVAL = 500  # save the representaton layer every ${SAVE_INTERVAL} epochs
 LEARNING_RATE = 0.1
 NUM_HIDDEN_UNITS = 15
@@ -31,26 +31,18 @@ NUM_HIDDEN_UNITS = 15
 data = pd.read_csv("data/Rumelhart_livingthings.csv", sep=",")
 
 items = sorted(data.Item.unique())
-relations = sorted(data.Relation.unique())
 attributes = sorted(data.Attribute.unique())
 
 num_items = len(items)
-num_relations = len(relations)
 num_attributes = len(attributes)
 
 # Make inputs and outputs
 data_table = pd.pivot_table(
-    data, values="TRUE", index=["Item", "Relation"], columns=["Attribute"], fill_value=0
+    data, values="TRUE", index=["Item"], columns=["Attribute"], fill_value=0
 ).astype(float)
 targets = tf.convert_to_tensor(data_table.values)  # output tensor
 
 input_items = keras.utils.to_categorical(range(num_items))  # input tensor [0]
-input_relations = keras.utils.to_categorical(range(num_relations))  # input tensor [1]
-inputs = [[], []]  # input tensor
-for item in input_items:
-    for relation in input_relations:
-        inputs[0].append(item)
-        inputs[1].append(relation)
 
 # Initializing the model
 # Item input layer
@@ -67,21 +59,15 @@ representations_layer = keras.layers.Dense(
     name="representations",
 )(items_layer)
 
-# Relaton input layer
-relations_layer = keras.Input(shape=(num_relations,), name="relations")
-
-# Combine the relations input & representations layer
-combined_layer = keras.layers.concatenate([representations_layer, relations_layer])
-
 # Hidden intermediate layer
 hidden_layer = keras.layers.Dense(
     NUM_HIDDEN_UNITS,
-    input_shape=(num_items + num_relations,),
+    input_shape=(num_items,),
     kernel_initializer=tf.random_uniform_initializer(minval=-1, maxval=1),
     # bias_initializer=tf.constant_initializer(-2),
     activation="sigmoid",
     name="hidden",
-)(combined_layer)
+)(representations_layer)
 
 # Attributes output layer
 attributes_layer = keras.layers.Dense(
@@ -96,23 +82,23 @@ attributes_layer = keras.layers.Dense(
 # MSE := keras.mean(keras.square(y_pred - y_true), axis=-1)
 # This was found to accelerate the process of learning; TODO long term differences MSE/SSE?
 def euclidean_distance(y_actual, y_predicted):
-    return keras.backend.sum(((y_actual - y_predicted) ** 2), axis=-1)
+    return 1 / 2 * K.sum(((y_actual - y_predicted) ** 2), axis=-1)
 
 
 # Compile the model
-model = keras.Model(inputs=[items_layer, relations_layer], outputs=attributes_layer)
+model = keras.Model(inputs=items_layer, outputs=attributes_layer)
 model.compile(
     # Use stochastic gradient descent as optimizer, without weight decay or momentum, as mentioned in (2003, p. 46)
     optimizer=keras.optimizers.SGD(learning_rate=LEARNING_RATE, momentum=0.0),
     # loss="mean_squared_error",
     loss=euclidean_distance,
     metrics=[
-        "accuracy",
         "binary_accuracy",
         "categorical_crossentropy",
         "mean_absolute_error",
     ],
 )
+
 
 # Custom callbacks for viewing the model in TensorBoard; which is launched with command:
 # $ tensorboard --logdir logs/fit
@@ -310,6 +296,19 @@ class LogWeightChange(keras.callbacks.Callback):
             tf.summary.image("Absolute weight change", img, step=0, max_outputs=1)
 
 
+class LogSVD(keras.callbacks.Callback):
+    def __init__(self):
+        self.ah = []
+
+    def on_epoch_end(self, epoch, logs=None):
+        if epoch % 50 == 0 or epoch == NUM_EPOCHS - 1:
+            output = model.predict_on_batch(input_items)
+            print(output)
+
+    def on_train_end(self, logs=None):
+        print()
+
+
 # Create the TensorBoard callback
 tensorboard_callback = keras.callbacks.TensorBoard(
     log_dir=log_dir, histogram_freq=1, embeddings_freq=50
@@ -317,7 +316,7 @@ tensorboard_callback = keras.callbacks.TensorBoard(
 
 # Finally, train the model!
 history = model.fit(
-    inputs,
+    input_items,
     targets,
     epochs=NUM_EPOCHS,
     callbacks=[
@@ -326,6 +325,7 @@ history = model.fit(
         LogDistanceMatrix(),
         LogWeightChange(),
         LogDendrogram(),
+        LogSVD(),
         LogPCA(),
     ],
     # Still unsure about batch size; should it be 1 for stochastic gradient descent?
