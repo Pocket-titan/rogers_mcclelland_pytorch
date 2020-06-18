@@ -25,7 +25,7 @@ plt.style.use("plotstyle.mplstyle")
 NUM_EPOCHS = 3500
 SAVE_INTERVAL = 500  # save the representaton layer every ${SAVE_INTERVAL} epochs
 LEARNING_RATE = 0.1
-NUM_HIDDEN_UNITS = 15
+NUM_REPRESENTATION_UNITS = 6
 
 # Read and format the data
 data = pd.read_csv("data/Rumelhart_livingthings.csv", sep=",")
@@ -50,7 +50,7 @@ items_layer = keras.Input(shape=(num_items,), name="items")
 
 # Representations intermediate layer
 representations_layer = keras.layers.Dense(
-    num_items,
+    NUM_REPRESENTATION_UNITS,
     activation="sigmoid",
     # Pick weights from a random uniform distribution with μ=0, σ^2=0.9 (2003, p. 46)
     kernel_initializer=tf.random_uniform_initializer(minval=-1, maxval=1),
@@ -59,16 +59,6 @@ representations_layer = keras.layers.Dense(
     name="representations",
 )(items_layer)
 
-# Hidden intermediate layer
-hidden_layer = keras.layers.Dense(
-    NUM_HIDDEN_UNITS,
-    input_shape=(num_items,),
-    kernel_initializer=tf.random_uniform_initializer(minval=-1, maxval=1),
-    # bias_initializer=tf.constant_initializer(-2),
-    activation="sigmoid",
-    name="hidden",
-)(representations_layer)
-
 # Attributes output layer
 attributes_layer = keras.layers.Dense(
     num_attributes,
@@ -76,7 +66,7 @@ attributes_layer = keras.layers.Dense(
     name="attributes",
     kernel_initializer=tf.random_uniform_initializer(minval=-1, maxval=1),
     # bias_initializer=tf.constant_initializer(-2),
-)(hidden_layer)
+)(representations_layer)
 
 # Use an SSE (Sum of Squared Error) loss function instead of an MSE (Mean Squared Error) one
 # MSE := keras.mean(keras.square(y_pred - y_true), axis=-1)
@@ -92,11 +82,7 @@ model.compile(
     optimizer=keras.optimizers.SGD(learning_rate=LEARNING_RATE, momentum=0.0),
     # loss="mean_squared_error",
     loss=euclidean_distance,
-    metrics=[
-        "binary_accuracy",
-        "categorical_crossentropy",
-        "mean_absolute_error",
-    ],
+    metrics=["binary_accuracy", "categorical_crossentropy", "mean_absolute_error",],
 )
 
 
@@ -253,7 +239,7 @@ class LogPCA(keras.callbacks.Callback):
 
 
 weight_changes = {}
-layer_names = ["representations", "hidden", "attributes"]
+layer_names = ["representations", "attributes"]
 
 
 class LogWeightChange(keras.callbacks.Callback):
@@ -298,15 +284,31 @@ class LogWeightChange(keras.callbacks.Callback):
 
 class LogSVD(keras.callbacks.Callback):
     def __init__(self):
-        self.ah = []
+        self.A_array = []
 
     def on_epoch_end(self, epoch, logs=None):
-        if epoch % 50 == 0 or epoch == NUM_EPOCHS - 1:
-            output = model.predict_on_batch(input_items)
-            print(output)
+        [W_12, _] = model.get_layer(name="representations").get_weights()
+        [W_23, _] = model.get_layer(name="attributes").get_weights()
+        UAVT = tf.linalg.matmul(W_12, W_23)
+        U, A, VT = np.linalg.svd(UAVT, full_matrices=False)
+        self.A_array.append(A)
+
+        # fig, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(14, 7), dpi=90)
+        # im2 = ax2.imshow(U, cmap="bwr")
+        # im3 = ax3.imshow(
+        #     np.diag(A), cmap="bwr", vmin=-np.max(A), vmax=np.max(np.diag(A))
+        # )
+        # im4 = ax4.imshow(VT, cmap="bwr", vmin=-1, vmax=1)
+        # plt.show()
 
     def on_train_end(self, logs=None):
-        print()
+        plt.plot([x[0] for x in self.A_array])
+        plt.plot([x[1] for x in self.A_array])
+        plt.plot([x[2] for x in self.A_array])
+        plt.plot([x[3] for x in self.A_array])
+        plt.plot([x[4] for x in self.A_array])
+        plt.plot([x[5] for x in self.A_array])
+        plt.show()
 
 
 # Create the TensorBoard callback
@@ -321,12 +323,12 @@ history = model.fit(
     epochs=NUM_EPOCHS,
     callbacks=[
         tensorboard_callback,
-        SaveRepresentation(),
-        LogDistanceMatrix(),
-        LogWeightChange(),
-        LogDendrogram(),
+        # SaveRepresentation(),
+        # LogDistanceMatrix(),
+        # LogWeightChange(),
+        # LogDendrogram(),
         LogSVD(),
-        LogPCA(),
+        # LogPCA(),
     ],
     # Still unsure about batch size; should it be 1 for stochastic gradient descent?
     # 32 (the whole set of [input, target] vectors) seems to give better results
