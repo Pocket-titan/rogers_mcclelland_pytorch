@@ -9,16 +9,16 @@ Inspired by the PyTorch implementation from https://github.com/jeffreyallenbrook
 The necessary packages change over time, but be sure to
 
 ```bash
-pip install tensorflow tensorboard
+pip/conda install torch torchvision tensorboard pandas scipy numpy seaborn scikit-learn matplotlib
 ```
 
 To train the model and generate log data, run
 
 ```python
-python main.py
+python feedforward.py
 ```
 
-To view the logs in TensorBoard after execution, run
+To view the logs in TensorBoard (it's nice to keep this running in a seperate process), run
 
 ```bash
 tensorboard --logdir logs/fit
