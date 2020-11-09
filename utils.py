@@ -2,7 +2,9 @@ from sklearn.decomposition import PCA
 from matplotlib import pyplot as plt
 from mpl_toolkits import axes_grid1
 from torchvision import transforms
+from collections import Counter
 from get_data import get_data
+from torch.utils import data
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -55,6 +57,24 @@ def plot_covariance_matrix(df: pd.DataFrame) -> matplotlib.figure.Figure:
 
 
 # show(plot_covariance_matrix(df.transpose()))
+
+
+def plot_input_input_correlation(df: pd.DataFrame) -> matplotlib.figure.Figure:
+    """
+    Plot the input-input correlation matrix
+    Note: how does this differ from covariance_matrix & item_attribute_matrix?
+    """
+    corr = df.corr()
+    cmap = sns.diverging_palette(240, 10, as_cmap=True)
+    fig, ax = plt.subplots(dpi=PLOT_DPI)
+    cax = ax.imshow(corr, cmap=cmap, interpolation="nearest")
+    plt.xticks(range(df.shape[1]), df.columns, rotation=45)
+    plt.yticks(range(df.shape[1]), df.columns)
+    add_colorbar(cax, ticks=np.unique(np.round(corr, decimals=2)))
+    return fig
+
+
+# show(input_input_correlation(df.transpose()))
 
 
 def plot_item_attribute_matrix(df: pd.DataFrame) -> matplotlib.figure.Figure:
@@ -267,4 +287,53 @@ def to_categorical(y, num_classes=None, dtype="float32"):
     output_shape = input_shape + (num_classes,)
     categorical = np.reshape(categorical, output_shape)
     return categorical
+
+
+def P(x):
+    return 1
+
+
+def P_joint(x, y):
+    return 2
+
+
+def I(X, Y):
+    return sum(
+        [P_joint(x, y) * np.log(P_joint(x, y) / (P(x) * P(y))) for x, y in zip(X, Y)]
+    )
+
+
+# print(I([1,1], [2,2,]))
+
+
+def get_pdfs(dataset: data.Dataset):
+    pdf_x, pdf_t, pdf_xt = [Counter(), Counter(), Counter()]
+    n_samples = dataset.__len__()
+
+    for i in range(n_samples):
+        (x, y) = dataset.__getitem__(i)
+        print(x, y)
+
+    # for i in range(n_train_samples):
+    #     pdf_x[x_train_int[i]] += 1 / float(n_train_samples)
+    #     pdf_y[y_train[i, 0]] += 1 / float(n_train_samples)
+    #     pdf_xt[(x_train_int[i],) + tuple(indices[i, :])] += 1 / float(n_train_samples)
+    #     pdf_yt[(y_train[i, 0],) + tuple(indices[i, :])] += 1 / float(n_train_samples)
+    #     pdf_t[tuple(indices[i, :])] += 1 / float(n_train_samples)
+
+
+def I(a, b):
+    pdf_x, pdf_t, pdf_xt = [Counter(), Counter(), Counter()]
+
+    mutual_information = 0
+
+
+# I(5, 5)
+
+
+def calculate_mututal_information():
+    "Calculates the mutual information"
+    # discretization
+    n_bins = 30
+    bins = np.linspace(-1, 1, n_bins + 1)
 

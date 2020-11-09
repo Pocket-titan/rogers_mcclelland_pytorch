@@ -1,5 +1,4 @@
-from utils import to_categorical, do_svd, plot_svd
-from learning_metrics import plot_SVD
+from utils import to_categorical, plot_svd
 from matplotlib import pyplot as plt
 from collections import OrderedDict
 from torch.utils import tensorboard
@@ -18,6 +17,8 @@ BATCH_SIZE = 64
 
 [items, attributes, df] = get_data()
 
+print(items)
+
 NUM_ITEMS = len(items)
 NUM_ATTRIBUTES = len(attributes)
 
@@ -27,9 +28,16 @@ y = torch.tensor(df.values, dtype=torch.float32)  # targets
 
 # Prepare the model
 class RNN(torch.nn.Module):
-    def __init__(self, input_size, output_size):
+    def __init__(self, input_size, hidden_dim, output_size, num_layers):
         super(RNN, self).__init__()
-        self.layer = torch.nn.RNN(input_size, hidden_size, num_layers)
+        self.rnn = torch.nn.RNN(
+            input_size,
+            hidden_dim,
+            num_layers,
+            batch_first=True,
+            nonlinearity="relu",
+        )
+        self.fc = torch.nn.Linear()
 
     def forward():
         pass
@@ -38,12 +46,10 @@ class RNN(torch.nn.Module):
         pass
 
 
-# Note: we have twice the layers compared to the Keras model, since keras layers (like
-# keras.layers.Dense) do _both_ the Linear & activation parts; PyTorch doesn't.
 model = torch.nn.Sequential(
     OrderedDict(
         [
-            ("representations", RNN(NUM_ITEMS, NUM_HIDDEN_UNITS)),
+            ("representations", RNN(NUM_ITEMS, NUM_HIDDEN_UNITS, NUM_HIDDEN_UNITS, 1)),
             ("attributes", torch.nn.Linear(NUM_HIDDEN_UNITS, NUM_ATTRIBUTES)),
             ("attributes_activation", torch.nn.Sigmoid()),
         ]
@@ -60,16 +66,12 @@ def init_weights(layer):
 
 model.apply(init_weights)
 
-# Define our loss and optimizer functions
 loss_fn = torch.nn.MSELoss(reduction="sum")
 optimizer = torch.optim.SGD(model.parameters(), lr=LEARNING_RATE)
 
-# Custom callbacks for viewing the model in TensorBoard; which is launched with command:
-# $ tensorboard --logdir logs/fit
-log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+log_dir = "logs/rnn/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
 writer = tensorboard.SummaryWriter(log_dir)
 
-# Main loop (look at how clean this looks compared to tf!)
 for epoch in range(NUM_EPOCHS):
     y_pred = model(x)
 

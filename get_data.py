@@ -3,6 +3,8 @@ import pandas as pd
 
 data = pd.read_csv("data/Rumelhart_livingthings.csv", sep=",")
 
+print("data\n", data)
+
 columns = [
     "Grow",
     "Living",
